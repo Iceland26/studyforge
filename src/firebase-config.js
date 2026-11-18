@@ -27,8 +27,17 @@ export const firebaseConfig = {
 /** Cloud model used for the fallback leg and for deliberate escalation. */
 export const CLOUD_MODEL = env.VITE_CLOUD_MODEL || 'gemini-3.5-flash-lite';
 
-/** Use the App Check debug provider (contest submissions accept debug tokens). */
+/** Use the App Check debug provider on localhost (debug token registered in the console). */
 export const APPCHECK_DEBUG = (env.VITE_APPCHECK_DEBUG ?? 'true') !== 'false';
+
+/**
+ * App Check production provider site key — Google Cloud Fraud Defense
+ * (reCAPTCHA Enterprise), registered for this web app in Firebase Console
+ * -> App Check. This is a PUBLIC identifier by design (it ships in every
+ * page load), not a secret.
+ */
+export const APPCHECK_SITE_KEY =
+  env.VITE_APPCHECK_SITE_KEY || '6Lf-VSYuAAAAAHGsFEizdCZs6azhCJXzzXz78LaU';
 
 /** True once a real project config has been supplied via .env. */
 export const isFirebaseConfigured = Boolean(

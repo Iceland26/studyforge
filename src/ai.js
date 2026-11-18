@@ -13,9 +13,10 @@
 //     cloud leg (default: gemini-3.5-flash-lite) is the honest tool for them.
 //   * Backend is the Gemini Developer API (GoogleAIBackend) so the project
 //     stays on the free Spark plan — no Blaze billing, no card.
-//   * App Check is initialized before AI Logic (required by Firebase);
-//     the debug provider is used for the contest build (debug tokens are
-//     accepted in submissions) — register the printed token in the console.
+//   * App Check is initialized before AI Logic (required by Firebase).
+//     Production origins use the registered Fraud Defense (reCAPTCHA
+//     Enterprise) provider; localhost keeps the debug provider (its token
+//     is registered in the console).
 //
 // If no real Firebase config exists yet (src/firebase-config.js), every call
 // routes to src/demo-ai.js, a local heuristic simulator, and results are
@@ -32,7 +33,7 @@ import {
   Schema,
 } from 'firebase/ai';
 
-import { firebaseConfig, CLOUD_MODEL, APPCHECK_DEBUG, isFirebaseConfigured } from './firebase-config.js';
+import { firebaseConfig, CLOUD_MODEL, APPCHECK_DEBUG, APPCHECK_SITE_KEY, isFirebaseConfigured } from './firebase-config.js';
 import { parseModelJson, normalizeDeck, normalizeExam } from './json-utils.js';
 import * as demo from './demo-ai.js';
 
@@ -68,18 +69,20 @@ function ensureFirebase() {
   if (app) return { app, ai };
   app = initializeApp(firebaseConfig);
 
-  // App Check MUST be initialized before AI Logic calls. In dev/contest
-  // builds we use the debug provider: setting FIREBASE_APPCHECK_DEBUG_TOKEN
-  // makes the SDK mint a debug token and print it to the console; register
-  // that token in Firebase Console -> App Check -> Manage debug tokens.
-  if (APPCHECK_DEBUG) {
+  // App Check MUST be initialized before AI Logic calls. On localhost we
+  // keep the debug provider: setting FIREBASE_APPCHECK_DEBUG_TOKEN makes
+  // the SDK mint a debug token (registered in Firebase Console -> App
+  // Check -> Manage debug tokens) and it takes precedence over the
+  // configured provider. On every other origin the debug global is never
+  // set, so the production Fraud Defense (reCAPTCHA Enterprise) provider
+  // runs with the registered site key.
+  const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(self.location?.hostname ?? '');
+  if (APPCHECK_DEBUG && isLocalhost) {
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
   try {
     initializeAppCheck(app, {
-      // The site key is only exercised by the production reCAPTCHA provider;
-      // with the debug flag set the debug provider takes precedence locally.
-      provider: new ReCaptchaEnterpriseProvider('studyforge-appcheck-placeholder-key'),
+      provider: new ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {

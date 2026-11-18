@@ -8,3 +8,6 @@ dist/
 smoke.png
 
 live-cloud.png
+.firebase/
+hosted.png
+hosted-cloud.png
