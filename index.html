@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StudyForge — Private AI study decks, forged on your device</title>
+    <meta
+      name="description"
+      content="StudyForge turns lecture notes into flashcards, quizzes and glossaries generated on-device with Gemini Nano via Firebase AI Logic — your notes stay on your machine. Cloud AI is used only when you ask for the tutor or an exam simulation."
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%234f46e5'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'%3ES%3C/text%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="demo-banner" class="demo-banner" hidden>
+      <strong>DEMO MODE — no Firebase project connected.</strong>
+      Generation is simulated locally with simple text heuristics. This is
+      <u>not</u> AI inference: connect a Firebase project (see README) to enable
+      real on-device / cloud generation.
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div>
+          <div class="brand-name">StudyForge</div>
+          <div class="brand-tag">Study decks forged on your device — not in someone else's cloud.</div>
+        </div>
+      </div>
+      <span id="mode-pill" class="pill pill-mode">…</span>
+    </header>
+
+    <section class="statusbar" aria-label="Hybrid inference status">
+      <div class="status-item">
+        <span id="device-dot" class="dot dot-unknown"></span>
+        <span id="device-text">On-device model: checking…</span>
+        <button id="device-setup-btn" class="btn btn-small" hidden>Set up on-device model</button>
+      </div>
+      <div class="status-item status-legend">
+        <span class="badge badge-device">On-device</span> generation is private &amp; works offline
+        <span class="sep">·</span>
+        <span class="badge badge-cloud">Cloud</span> is used only for the tutor &amp; exam simulation
+      </div>
+      <div class="status-item">
+        <span id="net-pill" class="pill pill-net">Online</span>
+      </div>
+    </section>
+
+    <div id="app-error" class="app-error" hidden>
+      <span id="app-error-text"></span>
+      <button id="app-error-close" class="btn btn-small btn-ghost" aria-label="Dismiss">✕</button>
+    </div>
+
+    <main class="layout">
+      <!-- Left: notes in, decks out -->
+      <aside class="panel panel-input">
+        <h2>Your notes</h2>
+        <p class="panel-sub">
+          Paste lecture notes, a chapter summary, or your own revision text.
+          Deck generation runs <strong>on-device by default</strong> — your
+          notes are not uploaded to generate flashcards, quizzes, or glossaries.
+        </p>
+        <textarea
+          id="notes-input"
+          rows="14"
+          placeholder="Paste your notes here… (at least a few sentences)"
+          aria-label="Your study notes"
+        ></textarea>
+        <div class="row row-between">
+          <span id="notes-count" class="muted">0 characters</span>
+          <span class="row">
+            <button id="sample-btn" class="btn btn-ghost">Load sample notes</button>
+            <button id="clear-notes-btn" class="btn btn-ghost">Clear</button>
+          </span>
+        </div>
+        <button id="generate-btn" class="btn btn-primary btn-block">
+          Forge my study deck
+        </button>
+        <p id="generate-status" class="status-line" role="status"></p>
+
+        <h3 class="decks-heading">Your decks <span class="muted">(stored locally)</span></h3>
+        <ul id="deck-list" class="deck-list"></ul>
+        <p id="deck-empty" class="muted">No decks yet — forge your first one above.</p>
+      </aside>
+
+      <!-- Right: study workspace -->
+      <section class="panel panel-workspace">
+        <div id="no-deck-state" class="empty-state">
+          <h2>No deck selected</h2>
+          <p>
+            Paste your notes on the left and hit <strong>“Forge my study deck”</strong>.
+            You will get flashcards, a multiple-choice quiz, and a glossary —
+            generated on-device whenever possible.
+          </p>
+          <p class="muted">
+            Then go deeper: ask the cloud <strong>Tutor</strong> questions about
+            your material, or run an <strong>Exam Simulation</strong>. Those two
+            deliberately use the cloud, because multi-turn chat and exam-grade
+            reasoning need a bigger model than the one in your browser.
+          </p>
+        </div>
+
+        <div id="deck-workspace" hidden>
+          <div class="workspace-head">
+            <h2 id="deck-title">Deck</h2>
+            <span id="deck-source-badge" class="badge"></span>
+          </div>
+
+          <nav class="tabs" role="tablist">
+            <button class="tab-btn is-active" data-tab="study" role="tab">Flashcards</button>
+            <button class="tab-btn" data-tab="quiz" role="tab">Quiz</button>
+            <button class="tab-btn" data-tab="glossary" role="tab">Glossary</button>
+            <button class="tab-btn" data-tab="tutor" role="tab">Tutor <span class="badge badge-cloud badge-mini">Cloud</span></button>
+            <button class="tab-btn" data-tab="exam" role="tab">Exam Sim <span class="badge badge-cloud badge-mini">Cloud</span></button>
+          </nav>
+
+          <!-- Flashcards -->
+          <div id="tab-study" class="tab-panel">
+            <div id="card-scene" class="card-scene" title="Click to flip">
+              <div id="flashcard" class="flashcard">
+                <div class="card-face card-front">
+                  <div class="card-kind">Question</div>
+                  <div id="card-front" class="card-text"></div>
+                  <div class="card-flip-hint">Click to reveal the answer</div>
+                </div>
+                <div class="card-face card-back">
+                  <div class="card-kind">Answer</div>
+                  <div id="card-back" class="card-text"></div>
+                  <div class="card-meta">
+                    <span id="card-tags" class="card-tags"></span>
+                    <span id="card-difficulty" class="badge badge-diff"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row row-center card-controls">
+              <button id="prev-card" class="btn">← Prev</button>
+              <span id="card-counter" class="muted">0 / 0</span>
+              <button id="next-card" class="btn">Next →</button>
+              <button id="shuffle-cards" class="btn btn-ghost">Shuffle</button>
+            </div>
+          </div>
+
+          <!-- Quiz -->
+          <div id="tab-quiz" class="tab-panel" hidden>
+            <div id="quiz-start-view">
+              <p id="quiz-meta" class="panel-sub"></p>
+              <button id="quiz-start-btn" class="btn btn-primary">Start quiz</button>
+            </div>
+            <div id="quiz-play-view" hidden>
+              <div class="row row-between">
+                <span id="quiz-progress" class="muted"></span>
+                <span id="quiz-score-live" class="muted"></span>
+              </div>
+              <h3 id="quiz-question" class="question-text"></h3>
+              <div id="quiz-options" class="options"></div>
+              <div id="quiz-feedback" class="feedback" hidden></div>
+              <button id="quiz-next-btn" class="btn btn-primary" hidden>Next question</button>
+            </div>
+            <div id="quiz-result-view" hidden>
+              <h3 id="quiz-score-text"></h3>
+              <p class="panel-sub">Review the flashcards for anything you missed, then try again — or escalate to the Exam Sim for harder, reasoning-based questions.</p>
+              <button id="quiz-restart-btn" class="btn btn-primary">Restart quiz</button>
+            </div>
+          </div>
+
+          <!-- Glossary -->
+          <div id="tab-glossary" class="tab-panel" hidden>
+            <input id="glossary-search" class="search-input" type="search" placeholder="Filter terms…" aria-label="Filter glossary terms" />
+            <dl id="glossary-list" class="glossary"></dl>
+          </div>
+
+          <!-- Tutor (cloud) -->
+          <div id="tab-tutor" class="tab-panel" hidden>
+            <div class="escalation-note">
+              <strong>Why the cloud?</strong> The tutor is a multi-turn
+              conversation, and on-device models in the browser only support
+              single-turn prompts. So the tutor runs on the cloud model via
+              Firebase AI Logic — your notes and deck are sent with your
+              questions so answers stay grounded in your material.
+            </div>
+            <div id="tutor-offline-note" class="offline-note" hidden>
+              You are offline. The tutor needs the cloud, so it is paused —
+              flashcards, quiz, and glossary keep working, and on-device deck
+              generation still works too.
+            </div>
+            <div id="tutor-messages" class="chat"></div>
+            <form id="tutor-form" class="chat-form">
+              <input id="tutor-input" type="text" placeholder="Ask about your notes… e.g. “Explain the Calvin cycle simply”" autocomplete="off" aria-label="Ask the tutor" />
+              <button class="btn btn-primary" type="submit">Ask</button>
+            </form>
+          </div>
+
+          <!-- Exam simulation (cloud) -->
+          <div id="tab-exam" class="tab-panel" hidden>
+            <div class="escalation-note">
+              <strong>Why the cloud?</strong> Exam simulation mixes topics and
+              writes reasoning-heavy questions with detailed grading
+              explanations — a deliberate escalation to the cloud model.
+              Deck generation stays on-device; only this generation step goes
+              to the cloud.
+            </div>
+            <div id="exam-offline-note" class="offline-note" hidden>
+              You are offline. Exam simulation needs the cloud — reconnect to
+              generate one. Your deck and quiz keep working offline.
+            </div>
+            <div id="exam-intro">
+              <button id="exam-generate-btn" class="btn btn-primary">Generate exam simulation</button>
+              <p id="exam-status" class="status-line" role="status"></p>
+            </div>
+            <div id="exam-play-view" hidden>
+              <div class="row row-between">
+                <span id="exam-progress" class="muted"></span>
+                <span id="exam-topic" class="badge badge-cloud"></span>
+              </div>
+              <h3 id="exam-question" class="question-text"></h3>
+              <div id="exam-options" class="options"></div>
+              <div id="exam-feedback" class="feedback" hidden></div>
+              <button id="exam-next-btn" class="btn btn-primary" hidden>Next question</button>
+            </div>
+            <div id="exam-result-view" hidden>
+              <h3 id="exam-score-text"></h3>
+              <button id="exam-restart-btn" class="btn btn-primary">New simulation</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Built with <strong>Firebase AI Logic</strong> hybrid inference for
+        #BuildHybridAI 2026: Gemini Nano on-device (Chrome Prompt API) for
+        private deck generation, Gemini in the cloud for tutoring and exam
+        simulation. Decks are stored only in your browser's local storage.
+      </p>
+    </footer>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
