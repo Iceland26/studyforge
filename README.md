@@ -11,6 +11,8 @@ SDK: a multi-turn **Tutor** chat and a reasoning-heavy **Exam Simulation**.
 
 Built for **#BuildHybridAI 2026** (Google × Firebase, Devpost).
 
+**Live demo: https://studyforge-66d67.web.app**
+
 ## Why hybrid, and why this split
 
 | Task | Where it runs | Why |
